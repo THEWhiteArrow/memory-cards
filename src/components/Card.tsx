@@ -5,15 +5,25 @@ import "./Card.css";
 type CardProps = {
   word: string;
   translation: Array<string>;
-  // nextCard: () => {};
+  onNextCard: () => Promise<void>;
+};
+
+type CardState = {
+  guess: string;
+  highlight: boolean;
+  incorrect: boolean;
+  incorrectString: string;
 };
 
 function Card(props: CardProps) {
-  const { word, translation } = props;
-  const [guess, setGuess] = useState("");
-  const [highlight, setHighlight] = useState(false);
-  const [incorrect, setIncorrect] = useState(false);
-  const [incorrectString, setIncorrectString] = useState("");
+  const { word, translation, onNextCard } = props;
+
+  const [state, setState] = useState<CardState>({
+    guess: "",
+    highlight: false,
+    incorrect: false,
+    incorrectString: "",
+  });
 
   function randomIncorrectString() {
     const incorrectStrings = [
@@ -37,39 +47,62 @@ function Card(props: CardProps) {
 
   useEffect(() => {
     function isCorrect() {
-      return guess.toLowerCase() === translation.join("").replaceAll(" ", "");
+      return (
+        state.guess.toLowerCase() === translation.join("").replaceAll(" ", "")
+      );
     }
-    function handleKeyPress(event: KeyboardEvent) {
+    async function handleKeyPress(event: KeyboardEvent) {
       // TODO: fix this enter not firiring
-      if (!highlight && event.key === "Backspace") {
-        setGuess((currentGuess) => currentGuess.slice(0, -1));
+
+      if (!state.highlight && event.key === "Backspace") {
+        setState((currentState) => ({
+          ...currentState,
+          guess: currentState.guess.slice(0, -1),
+        }));
       } else if (event.key === "Enter") {
         if (isCorrect()) {
-          if (highlight) {
-            // nextCard();
+          if (state.highlight) {
+            setState((currentState) => ({
+              ...currentState,
+              highlight: false,
+              incorrect: false,
+              guess: "",
+            }));
+            await onNextCard();
+          } else {
+            setState((currentState) => ({
+              ...currentState,
+              highlight: true,
+              incorrect: false,
+            }));
           }
-          setHighlight(true);
-          setIncorrect(false);
+
           console.log("Correct");
         } else {
-          setIncorrect(true);
-          setIncorrectString(randomIncorrectString());
+          setState((currentState) => ({
+            ...currentState,
+            incorrect: true,
+            incorrectString: randomIncorrectString(),
+          }));
           console.log("Incorrect");
         }
       } else if (
-        !highlight &&
+        !state.highlight &&
         event.key.length === 1 &&
         event.key !== " " &&
-        guess.length <
-          (translation.join("").replaceAll(" ", "").match(/\w/g) || []).length
+        state.guess.length <
+          (translation.join("").replaceAll(" ", "") || []).length
       ) {
-        setGuess((currentGuess) => currentGuess + event.key);
+        setState((currentState) => ({
+          ...currentState,
+          guess: currentState.guess + event.key,
+        }));
       }
     }
 
     window.addEventListener("keydown", handleKeyPress);
     return () => window.removeEventListener("keydown", handleKeyPress);
-  }, [guess, highlight, translation]);
+  }, [state, onNextCard, translation]);
 
   let currentIndex = 0;
 
@@ -78,8 +111,8 @@ function Card(props: CardProps) {
       {word.split("").map((letter, i) => (
         <CardLetter
           key={`${j}_${i}`}
-          highlight={highlight}
-          letter={letter === " " ? " " : guess[currentIndex++]}
+          highlight={state.highlight}
+          letter={letter === " " ? " " : state.guess[currentIndex++]}
         />
       ))}
     </div>
@@ -89,7 +122,9 @@ function Card(props: CardProps) {
     <div className="Card">
       <h2>{word}</h2>
       <div className="CardGuessContainer">{cards}</div>
-      <div className="CardIncorrect">{incorrect ? incorrectString : ""}</div>
+      <div className="CardIncorrect">
+        {state.incorrect ? state.incorrectString : ""}
+      </div>
     </div>
   );
 }
